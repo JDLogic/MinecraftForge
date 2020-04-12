@@ -35,6 +35,7 @@ import java.lang.management.MemoryUsage;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.List;
+import java.util.Locale;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
@@ -44,6 +45,7 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 class ClientVisualization implements EarlyProgressVisualization.Visualization {
+    private boolean ismac = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("mac");
     private final int screenWidth = 800;
     private final int screenHeight = 400;
     private long window;
@@ -90,6 +92,7 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
         glfwShowWindow(window);
+        glfwPollEvents();
         GL.createCapabilities();
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -116,7 +119,8 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
         glEnable(GL_BLEND);
         renderMessages();
         glfwSwapBuffers(window);
-        glfwPollEvents();
+        if (!ismac)
+            glfwPollEvents();
     }
 
     private static float clamp(float num, float min, float max) {
@@ -230,6 +234,8 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
     }
 
     private void closeWindow() {
+        if (ismac)
+            glfwPollEvents();
         glfwFreeCallbacks(window);
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -238,6 +244,8 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
 
     @Override
     public void start() {
+        initWindow();
+        glfwMakeContextCurrent(NULL); // give up context for other thread
         thread = new Thread(this::run);
         thread.setDaemon(true);
         thread.start();
@@ -245,7 +253,8 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
 
     private void run() {
         running = true;
-        initWindow();
+        glfwMakeContextCurrent(window);
+        GL.createCapabilities();
         while (running) {
             renderProgress();
             try {
@@ -253,7 +262,7 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
             } catch (InterruptedException e) {
             }
         }
-        closeWindow();
+        glfwMakeContextCurrent(NULL);
     }
 
     @Override
@@ -263,5 +272,7 @@ class ClientVisualization implements EarlyProgressVisualization.Visualization {
             thread.join();
         } catch (InterruptedException e) {
         }
+        glfwMakeContextCurrent(window);
+        closeWindow();
     }
 }
